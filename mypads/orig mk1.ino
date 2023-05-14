@@ -1,15 +1,100 @@
 #include <inttypes.h>
 
+// BEGIN FASTLED SETUP
+#include <FastLED.h>
+#define NUM_PANELS 4
+#define NUM_LEDS 48
+#define LED_TYPE WS2812B
+#define COLOR_ORDER GRB
+#define BRIGHTNESS 200
+#define VOLTS 5
+#define MAX_AMPS 8000
+
+CRGB upLeds[NUM_LEDS];
+CRGB downLeds[NUM_LEDS];
+CRGB leftLeds[NUM_LEDS];
+CRGB rightLeds[NUM_LEDS];
+
+//left down up right
+CRGB defaultColors[4] = {
+  CRGB::DarkBlue,
+  CRGB::DeepSkyBlue,
+  CRGB::Crimson,
+  CRGB::DeepPink
+};
+
+CRGB christmasColors[4] = {
+  CRGB::DarkGreen,
+  CRGB::Green,
+  CRGB::DarkRed,
+  CRGB::Red
+};
+
+int TOTAL_FRAMES = 96;
+int animationFrames[4] = {0, 0, 0, 0};
+
+void endToEndIdle(int panelIndex) {
+  if(animationFrames[panelIndex] < 48) {
+    if(panelIndex == 0) { leftLeds[animationFrames[panelIndex]] = defaultColors[0]; }
+    if(panelIndex == 1) { downLeds[animationFrames[panelIndex]] = defaultColors[2]; }
+    if(panelIndex == 2) { upLeds[animationFrames[panelIndex]] = defaultColors[2]; }
+    if(panelIndex == 3) { rightLeds[animationFrames[panelIndex]] = defaultColors[0]; }
+  } else {
+    int loopBack[4] = {
+      animationFrames[0] - NUM_LEDS,
+      animationFrames[1] - NUM_LEDS,
+      animationFrames[2] - NUM_LEDS,
+      animationFrames[3] - NUM_LEDS
+    };
+    if(panelIndex == 0) { leftLeds[loopBack[panelIndex]] = defaultColors[1]; }
+    if(panelIndex == 1) { downLeds[loopBack[panelIndex]] = defaultColors[3]; }
+    if(panelIndex == 2) { upLeds[loopBack[panelIndex]] = defaultColors[3]; }
+    if(panelIndex == 3) { rightLeds[loopBack[panelIndex]] = defaultColors[1]; }
+  }
+}
+
+void clearPanelLEDs(int panelIndex) {
+  switch(panelIndex) {
+    case 0:
+      for(int i = 0; i < NUM_LEDS; i++) { leftLeds[i] = CRGB::Black; }
+      break;
+    case 1:
+      for(int i = 0; i < NUM_LEDS; i++) { downLeds[i] = CRGB::Black; }
+      break;
+    case 2:
+      for(int i = 0; i < NUM_LEDS; i++) { upLeds[i] = CRGB::Black; }
+      break;
+    case 3:
+      for(int i = 0; i < NUM_LEDS; i++) { rightLeds[i] = CRGB::Black; }
+      break;
+  }
+  FastLED.show();
+}
+
+void activePanelLEDs(int k) {
+  switch(k) {
+    case 0:
+      for(int i = 0; i < NUM_LEDS; i++) { leftLeds[i] = CRGB::White; }
+      break;
+    case 1:
+      for(int i = 0; i < NUM_LEDS; i++) { downLeds[i] = CRGB::White; }
+      break;
+    case 2:
+      for(int i = 0; i < NUM_LEDS; i++) { upLeds[i] = CRGB::White; }
+      break;
+    case 3:
+      for(int i = 0; i < NUM_LEDS; i++) { rightLeds[i] = CRGB::White; }
+      break;
+  }
+  FastLED.show();
+}
+
+// END FASTLED SETUP
+
 #if !defined(__AVR_ATmega32U4__) && !defined(__AVR_ATmega328P__) && \
     !defined(__AVR_ATmega1280__) && !defined(__AVR_ATmega2560__)
   #define CAN_AVERAGE
 #endif
-
-#if defined(_SFR_BYTE) && defined(_BV) && defined(ADCSRA)
-  #define CLEAR_BIT(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
-  #define SET_BIT(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
-#endif
-
 
 #ifdef CORE_TEENSY
   // Use the Joystick library for Teensy
@@ -60,7 +145,7 @@ uint8_t curButtonNum = 1;
 // some existing sensor pins so if you see some weird behavior it might be
 // because of this. Uncomment the following line to enable the feature.
 
-//#define ENABLE_LIGHTS
+#define ENABLE_LIGHTS
 
 // We don't want to use digital pins 0 and 1 as they're needed for Serial
 // communication so we start curLightPin from 2.
@@ -100,8 +185,7 @@ class WeightedMovingAverage {
     // are integers and we need to return an int anyways. Off by one isn't
     // substantial here.
     // Sum of weights = sum of all integers from [1, size_]
-    int16_t sum_weights = ((size_ * (size_ + 1)) / 2);
-    return next_weighted_sum/sum_weights;
+    return next_weighted_sum/((size_ * (size_ + 1)) / 2);
   }
 
   // Delete default constructor. Size MUST be explicitly specified.
@@ -140,9 +224,6 @@ class HullMovingAverage {
     return hull_value;
   }
 
-  // Delete default constructor. Size MUST be explicitly specified.
-  HullMovingAverage() = delete;
-
  private:
   WeightedMovingAverage wma1_;
   WeightedMovingAverage wma2_;
@@ -161,7 +242,7 @@ class SensorState {
         #if defined(ENABLE_LIGHTS)
         kLightsPin(curLightPin++),
         #endif
-        buttonNum(curButtonNum) {
+        kButtonNum(curButtonNum++) {
     for (size_t i = 0; i < kMaxSharedSensors; ++i) {
       sensor_ids_[i] = 0;
       individual_states_[i] = SensorState::OFF;
@@ -169,14 +250,6 @@ class SensorState {
     #if defined(ENABLE_LIGHTS)
       pinMode(kLightsPin, OUTPUT);
     #endif
-  }
-
-  void Init() {
-    if (initialized_) {
-      return;
-    }
-    buttonNum = curButtonNum++;
-    initialized_ = true;
   }
 
   // Adds a new sensor to share this state with. If we try adding a sensor that
@@ -191,9 +264,6 @@ class SensorState {
   void EvaluateSensor(uint8_t sensor_id,
                       int16_t cur_value,
                       int16_t user_threshold) {
-    if (!initialized_) {
-      return;
-    }
     size_t sensor_index = GetIndexForSensor(sensor_id);
 
     // The sensor we're evaluating is not part of this shared state.
@@ -201,8 +271,6 @@ class SensorState {
     if (sensor_index == SIZE_MAX) {
       return;
     }
-
-    State prevState = individual_states_[sensor_index];
 
     // If we're above the threshold, turn the individual sensor on.
     if (cur_value >= user_threshold + kPaddingWidth) {
@@ -218,19 +286,6 @@ class SensorState {
     // should we determine if we want to send a press/release event.
     bool all_evaluated = (sensor_index == num_sensors_ - 1);
 
-    switch(prevState) {
-        case SensorState::OFF:
-          if(individual_states_[sensor_index] == SensorState::ON) {
-              activePanelLEDs((buttonNum-1) + 4 * sensor_index);
-          }
-          break;
-        case SensorState::ON:
-          if(individual_states_[sensor_index] == SensorState::OFF) {
-              clearPanelLEDs((buttonNum-1) + 4 * sensor_index);
-          }
-          break;
-      }
-
     if (all_evaluated) {
       switch (combined_state_) {
         case SensorState::OFF:
@@ -244,10 +299,13 @@ class SensorState {
               }
             }
             if (turn_on) {
-              ButtonPress(buttonNum);
+              ButtonPress(kButtonNum);
               combined_state_ = SensorState::ON;
               #if defined(ENABLE_LIGHTS)
                 digitalWrite(kLightsPin, HIGH);
+                // Light on
+                // Set panel LED to active color
+                activePanelLEDs(kButtonNum-1);
               #endif
             }
           }
@@ -263,10 +321,14 @@ class SensorState {
               }
             }
             if (turn_off) {
-              ButtonRelease(buttonNum);
+              ButtonRelease(kButtonNum);
               combined_state_ = SensorState::OFF;
               #if defined(ENABLE_LIGHTS)
                 digitalWrite(kLightsPin, LOW);
+                // Light off
+                // Reset panel LED back to idle color (or off, if black)
+                //idlePanelLEDs(kButtonNum-1);
+                clearPanelLEDs(kButtonNum-1);
               #endif
             }
           }
@@ -291,9 +353,6 @@ class SensorState {
   }
 
  private:
-  // Ensures that Init() has been called at exactly once on this SensorState.
-  bool initialized_;
-
   // The collection of sensors shared with this state.
   uint8_t sensor_ids_[kMaxSharedSensors];
   // The number of sensors this state combines with.
@@ -318,8 +377,7 @@ class SensorState {
   #endif
 
   // The button number this state corresponds to.
-  // Set once in Init().
-  uint8_t buttonNum;
+  const uint8_t kButtonNum;
 };
 
 /*===========================================================================*/
@@ -359,11 +417,6 @@ class Sensor {
       should_delete_state_ = true;
     }
 
-    // Initialize the sensor state.
-    // This sets the button number corresponding to the sensor state.
-    // Trying to re-initialize a sensor_state_ is a no-op, so no harm in 
-    sensor_state_->Init();
-
     // If this sensor hasn't been added to the state, then try adding it.
     if (sensor_state_->GetIndexForSensor(sensor_id) == SIZE_MAX) {
       sensor_state_->AddSensor(sensor_id);
@@ -387,7 +440,6 @@ class Sensor {
     #if defined(CAN_AVERAGE)
       // Fetch the updated Weighted Moving Average.
       cur_value_ = moving_average_.GetAverage(sensor_value) - offset_;
-      cur_value_ = constrain(cur_value_, 0, 1023);
     #else
       // Don't use averaging for Arduino Leonardo, Uno, Mega1280, and Mega2560
       // since averaging seems to be broken with it. This should also include
@@ -421,6 +473,11 @@ class Sensor {
 
   int16_t GetThreshold() {
     return user_threshold_;
+  }
+
+  bool IsTriggered() {
+    if(sensor_state_->CombinedStateIsOn()) { return true; }
+    else { return false; }
   }
 
   // Delete default constructor. Pin number MUST be explicitly specified.
@@ -475,18 +532,11 @@ class Sensor {
 //   Sensor(A4),
 // };
 
-SensorState states[4] = {
-};
-
 Sensor kSensors[] = {
-  Sensor(A0, &states[0]),
-  Sensor(A1, &states[1]),
-  Sensor(A2, &states[2]),
-  Sensor(A3, &states[3]),
-  Sensor(A4, &states[0]),
-  Sensor(A5, &states[1]),
-  Sensor(A6, &states[2]),
-  Sensor(A7, &states[3]),
+  Sensor(A0),
+  Sensor(A1),
+  Sensor(A2),
+  Sensor(A3),
 };
 const size_t kNumSensors = sizeof(kSensors)/sizeof(Sensor);
 
@@ -519,9 +569,8 @@ class SerialProcessor {
         case 'T':
           PrintThresholds();
           break;
-        case '0' ... '9': // Case ranges are non-standard but work in gcc
-          UpdateAndPrintThreshold(bytes_read);
         default:
+          UpdateAndPrintThreshold(bytes_read);
           break;
       }
     }  
@@ -529,20 +578,17 @@ class SerialProcessor {
 
   void UpdateAndPrintThreshold(size_t bytes_read) {
     // Need to specify:
-    // Sensor number + Threshold value, separated by a space.
-    // {0, 1, 2, 3,...} + "0"-"1023"
-    // e.g. 3 180 (fourth FSR, change threshold to 180)
+    // Sensor number + Threshold value.
+    // {0, 1, 2, 3} + "0"-"1023"
+    // e.g. 3180 (fourth FSR, change threshold to 180)
     
-    if (bytes_read < 3 || bytes_read > 7) { return; }
+    if (bytes_read < 2 || bytes_read > 5) { return; }
 
-    char* next = nullptr;
-    size_t sensor_index = strtoul(buffer_, &next, 10);
-    if (sensor_index >= kNumSensors) { return; }
+    size_t sensor_index = buffer_[0] - '0';
+    if (sensor_index < 0 || sensor_index >= kNumSensors) { return; }
 
-    int16_t sensor_threshold = strtol(next, nullptr, 10);
-    if (sensor_threshold < 0 || sensor_threshold > 1023) { return; }
-
-    kSensors[sensor_index].UpdateThreshold(sensor_threshold);
+    kSensors[sensor_index].UpdateThreshold(
+        strtoul(buffer_ + 1, nullptr, 10));
     PrintThresholds();
   }
 
@@ -585,33 +631,31 @@ unsigned long lastSend = 0;
 // loop().
 long loopTime = -1;
 
+long lightLoop = -1;
+unsigned long lastLightUpdate = 0;
+
 void setup() {
-  lightInit();
+
+  // Add the LEDs
+  FastLED.addLeds<LED_TYPE, 6, COLOR_ORDER>(downLeds, NUM_LEDS).setCorrection(TypicalLEDStrip);   
+  FastLED.addLeds<LED_TYPE, 5, COLOR_ORDER>(leftLeds, NUM_LEDS).setCorrection(TypicalLEDStrip);   
+  FastLED.addLeds<LED_TYPE, 4, COLOR_ORDER>(rightLeds, NUM_LEDS).setCorrection(TypicalLEDStrip);   
+  FastLED.addLeds<LED_TYPE, 3, COLOR_ORDER>(upLeds, NUM_LEDS).setCorrection(TypicalLEDStrip);   
+  FastLED.setBrightness(BRIGHTNESS);
+  FastLED.setMaxPowerInVoltsAndMilliamps(VOLTS, MAX_AMPS);
 
   serialProcessor.Init(kBaudRate);
   ButtonStart();
   for (size_t i = 0; i < kNumSensors; ++i) {
     // Button numbers should start with 1.
     kSensors[i].Init(i + 1);
-    //kSensors[i].UpdateThreshold(700);
   }
-  kSensors[0].UpdateThreshold(300);
-  kSensors[1].UpdateThreshold(300);
-  kSensors[2].UpdateThreshold(270);
-  kSensors[3].UpdateThreshold(300);
-  kSensors[4].UpdateThreshold(650);
-  kSensors[5].UpdateThreshold(450);
-  kSensors[6].UpdateThreshold(550);
-  kSensors[7].UpdateThreshold(550);
 
-  #if defined(CLEAR_BIT) && defined(SET_BIT)
-	  // Set the ADC prescaler to 16 for boards that support it,
-	  // which is a good balance between speed and accuracy.
-	  // More information can be found here: http://www.gammon.com.au/adc
-	  SET_BIT(ADCSRA, ADPS2);
-	  CLEAR_BIT(ADCSRA, ADPS1);
-	  CLEAR_BIT(ADCSRA, ADPS0);
-  #endif
+  //left, down, up, right
+  kSensors[0].UpdateThreshold(350);
+  kSensors[1].UpdateThreshold(350);
+  kSensors[2].UpdateThreshold(350);
+  kSensors[3].UpdateThreshold(350);
 }
 
 void loop() {
@@ -620,16 +664,28 @@ void loop() {
   // read the analog values as fast as we can to have the most up to date
   // values for the average.
   static bool willSend;
-  // Separate out the initialization and the update steps for willSend.
-  // Since willSend is static, we want to make sure we update the variable
-  // every time we loop.
   willSend = (loopTime == -1 || startMicros - lastSend + loopTime >= 1000);
+  static bool lightUpdate;
+  lightUpdate = (lightLoop == -1 || startMicros - lastLightUpdate + lightLoop >= 20000);
 
   serialProcessor.CheckAndMaybeProcessData();
 
   for (size_t i = 0; i < kNumSensors; ++i) {
     kSensors[i].EvaluateSensor(willSend);
+
+    if(lightUpdate) {
+      if(!kSensors[i].IsTriggered()) {
+        endToEndIdle(i);
+        animationFrames[i]++;
+        if(animationFrames[i] >= TOTAL_FRAMES) { animationFrames[i] = 0; }
+      } else {
+        //Reset animation frame if triggered
+        //animationFrames[i] = 0;
+      }
+    }
   }
+
+  Serial.print( tempmonGetTemp() );
 
   if (willSend) {
     lastSend = startMicros;
@@ -638,9 +694,16 @@ void loop() {
     #endif
   }
 
+  if(lightUpdate) {
+    lastLightUpdate = startMicros;
+    FastLED.show();
+  }
+
   if (loopTime == -1) {
     loopTime = micros() - startMicros;
   }
 
-  checkAndUpdateLights();
+  if(lightLoop == -1) {
+    lightLoop = micros() - startMicros;
+  }
 }

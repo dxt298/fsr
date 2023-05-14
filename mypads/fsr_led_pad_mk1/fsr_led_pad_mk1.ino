@@ -161,7 +161,7 @@ class SensorState {
         #if defined(ENABLE_LIGHTS)
         kLightsPin(curLightPin++),
         #endif
-        buttonNum(curButtonNum++) {
+        buttonNum(curButtonNum) {
     for (size_t i = 0; i < kMaxSharedSensors; ++i) {
       sensor_ids_[i] = 0;
       individual_states_[i] = SensorState::OFF;
@@ -234,6 +234,7 @@ class SensorState {
               #if defined(ENABLE_LIGHTS)
                 digitalWrite(kLightsPin, HIGH);
               #endif
+              activePanelLEDs(buttonNum-1);
             }
           }
           break;
@@ -253,6 +254,7 @@ class SensorState {
               #if defined(ENABLE_LIGHTS)
                 digitalWrite(kLightsPin, LOW);
               #endif
+              clearPanelLEDs(buttonNum-1);
             }
           }
           break;
@@ -269,6 +271,10 @@ class SensorState {
       }
     }
     return SIZE_MAX;
+  }
+
+  bool CombinedStateIsOn() {
+    return combined_state_ == SensorState::ON;
   }
 
  private:
@@ -456,11 +462,14 @@ class Sensor {
 //   Sensor(A4),
 // };
 
+SensorState states[4] = {
+};
+
 Sensor kSensors[] = {
-  Sensor(A0),
-  Sensor(A1),
-  Sensor(A2),
-  Sensor(A3),
+  Sensor(A0, &states[0]),
+  Sensor(A1, &states[1]),
+  Sensor(A2, &states[2]),
+  Sensor(A3, &states[3]),
 };
 const size_t kNumSensors = sizeof(kSensors)/sizeof(Sensor);
 
@@ -560,11 +569,14 @@ unsigned long lastSend = 0;
 long loopTime = -1;
 
 void setup() {
+  lightInit();
+
   serialProcessor.Init(kBaudRate);
   ButtonStart();
   for (size_t i = 0; i < kNumSensors; ++i) {
     // Button numbers should start with 1.
     kSensors[i].Init(i + 1);
+    kSensors[i].UpdateThreshold(350);
   }
   
   #if defined(CLEAR_BIT) && defined(SET_BIT)
@@ -604,4 +616,6 @@ void loop() {
   if (loopTime == -1) {
     loopTime = micros() - startMicros;
   }
+
+  checkAndUpdateLights();
 }

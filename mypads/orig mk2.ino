@@ -1,5 +1,134 @@
 #include <inttypes.h>
 
+// BEGIN FASTLED SETUP
+#include <FastLED.h>
+#define NUM_PANELS 4
+#define NUM_LEDS 52
+#define LED_TYPE WS2812B
+#define COLOR_ORDER GRB
+#define BRIGHTNESS 200
+#define VOLTS 5
+#define MAX_AMPS 8000
+
+CRGB upLeds[NUM_LEDS];
+CRGB downLeds[NUM_LEDS];
+CRGB leftLeds[NUM_LEDS];
+CRGB rightLeds[NUM_LEDS];
+
+//right down up left
+CRGB defaultColors[4] = {
+  CRGB::DarkBlue,
+  CRGB::DeepSkyBlue,
+  CRGB::Crimson,
+  CRGB::DeepPink
+};
+
+CRGB christmasColors[4] = {
+  CRGB::DarkGreen,
+  CRGB::Green,
+  CRGB::DarkRed,
+  CRGB::Red
+};
+
+int TOTAL_FRAMES = 104;
+int animationFrames[4] = {0, 0, 0, 0};
+
+void endToEndIdle(int panelIndex) {
+  if(animationFrames[panelIndex] < 52) {
+    if(panelIndex == 0) { rightLeds[animationFrames[panelIndex]] = defaultColors[0]; }
+    if(panelIndex == 1) { downLeds[animationFrames[panelIndex]] = defaultColors[2]; }
+    if(panelIndex == 2) { upLeds[animationFrames[panelIndex]] = defaultColors[2]; }
+    if(panelIndex == 3) { leftLeds[animationFrames[panelIndex]] = defaultColors[0]; }
+  } else {
+    int loopBack[4] = {
+      animationFrames[0] - NUM_LEDS,
+      animationFrames[1] - NUM_LEDS,
+      animationFrames[2] - NUM_LEDS,
+      animationFrames[3] - NUM_LEDS
+    };
+    if(panelIndex == 0) { rightLeds[loopBack[panelIndex]] = defaultColors[1]; }
+    if(panelIndex == 1) { downLeds[loopBack[panelIndex]] = defaultColors[3]; }
+    if(panelIndex == 2) { upLeds[loopBack[panelIndex]] = defaultColors[3]; }
+    if(panelIndex == 3) { leftLeds[loopBack[panelIndex]] = defaultColors[1]; }
+  }
+}
+
+void clearPanelLEDs(int k) {
+  int offset = 7;
+  int offset2 = (NUM_LEDS/2) + offset;
+  
+  switch(k) {
+    case 0:
+      for(int i = 0; i < offset; i++) { rightLeds[i] = CRGB::Black; }
+      for(int i = offset2; i < NUM_LEDS; i++) { rightLeds[i] = CRGB::Black; }
+      break;
+    case 1:
+      for(int i = 0; i < offset; i++) { downLeds[i] = CRGB::Black; }
+      for(int i = offset2; i < NUM_LEDS; i++) { downLeds[i] = CRGB::Black; }
+      break;
+    case 2:
+      for(int i = 0; i < offset; i++) { upLeds[i] = CRGB::Black; }
+      for(int i = offset2; i < NUM_LEDS; i++) { upLeds[i] = CRGB::Black; }
+      break;
+    case 3:
+      for(int i = 0; i < offset; i++) { leftLeds[i] = CRGB::Black; }
+      for(int i = offset2; i < NUM_LEDS; i++) { leftLeds[i] = CRGB::Black; }
+      break;
+    case 4:
+      for(int i = offset; i < offset2; i++) { rightLeds[i] = CRGB::Black; }
+      break;
+    case 5:
+      for(int i = offset; i < offset2; i++) { downLeds[i] = CRGB::Black; }
+      break;
+    case 6:
+      for(int i = offset; i < offset2; i++) { upLeds[i] = CRGB::Black; }
+      break;
+    case 7:
+      for(int i = offset; i < offset2; i++) { leftLeds[i] = CRGB::Black; }
+      break;
+  }
+  FastLED.show();
+}
+
+void activePanelLEDs(int k) {
+  int offset = 7;
+  int offset2 = (NUM_LEDS/2) + offset;
+  
+  switch(k) {
+    case 0:
+      for(int i = 0; i < offset; i++) { rightLeds[i] = CRGB::White; }
+      for(int i = offset2; i < NUM_LEDS; i++) { rightLeds[i] = CRGB::White; }
+      break;
+    case 1:
+      for(int i = 0; i < offset; i++) { downLeds[i] = CRGB::White; }
+      for(int i = offset2; i < NUM_LEDS; i++) { downLeds[i] = CRGB::White; }
+      break;
+    case 2:
+      for(int i = 0; i < offset; i++) { upLeds[i] = CRGB::White; }
+      for(int i = offset2; i < NUM_LEDS; i++) { upLeds[i] = CRGB::White; }
+      break;
+    case 3:
+      for(int i = 0; i < offset; i++) { leftLeds[i] = CRGB::White; }
+      for(int i = offset2; i < NUM_LEDS; i++) { leftLeds[i] = CRGB::White; }
+      break;
+    case 4:
+      for(int i = offset; i < offset2; i++) { rightLeds[i] = CRGB::White; }
+      break;
+    case 5:
+      for(int i = offset; i < offset2; i++) { downLeds[i] = CRGB::White; }
+      break;
+    case 6:
+      for(int i = offset; i < offset2; i++) { upLeds[i] = CRGB::White; }
+      break;
+    case 7:
+      for(int i = offset; i < offset2; i++) { leftLeds[i] = CRGB::White; }
+      break;
+  }
+  FastLED.show();
+}
+
+// END FASTLED SETUP
+
 #if !defined(__AVR_ATmega32U4__) && !defined(__AVR_ATmega328P__) && \
     !defined(__AVR_ATmega1280__) && !defined(__AVR_ATmega2560__)
   #define CAN_AVERAGE
@@ -60,7 +189,7 @@ uint8_t curButtonNum = 1;
 // some existing sensor pins so if you see some weird behavior it might be
 // because of this. Uncomment the following line to enable the feature.
 
-//#define ENABLE_LIGHTS
+#define ENABLE_LIGHTS
 
 // We don't want to use digital pins 0 and 1 as they're needed for Serial
 // communication so we start curLightPin from 2.
@@ -248,6 +377,9 @@ class SensorState {
               combined_state_ = SensorState::ON;
               #if defined(ENABLE_LIGHTS)
                 digitalWrite(kLightsPin, HIGH);
+                // Light on
+                // Set panel LED to active color
+                //activePanelLEDs(buttonNum-1);
               #endif
             }
           }
@@ -267,6 +399,9 @@ class SensorState {
               combined_state_ = SensorState::OFF;
               #if defined(ENABLE_LIGHTS)
                 digitalWrite(kLightsPin, LOW);
+                // Light off
+                // Reset panel LED back to idle color (or off, if black)
+                //clearPanelLEDs(buttonNum-1);
               #endif
             }
           }
@@ -421,6 +556,11 @@ class Sensor {
 
   int16_t GetThreshold() {
     return user_threshold_;
+  }
+
+  bool IsTriggered() {
+    if(sensor_state_->CombinedStateIsOn()) { return true; }
+    else { return false; }
   }
 
   // Delete default constructor. Pin number MUST be explicitly specified.
@@ -585,25 +725,27 @@ unsigned long lastSend = 0;
 // loop().
 long loopTime = -1;
 
+long lightLoop = -1;
+unsigned long lastLightUpdate = 0;
+
 void setup() {
-  lightInit();
+
+  // Add the LEDs
+  FastLED.addLeds<LED_TYPE, 6, COLOR_ORDER>(downLeds, NUM_LEDS).setCorrection(TypicalLEDStrip);   
+  FastLED.addLeds<LED_TYPE, 5, COLOR_ORDER>(leftLeds, NUM_LEDS).setCorrection(TypicalLEDStrip);   
+  FastLED.addLeds<LED_TYPE, 4, COLOR_ORDER>(rightLeds, NUM_LEDS).setCorrection(TypicalLEDStrip);   
+  FastLED.addLeds<LED_TYPE, 3, COLOR_ORDER>(upLeds, NUM_LEDS).setCorrection(TypicalLEDStrip);   
+  FastLED.setBrightness(BRIGHTNESS);
+  FastLED.setMaxPowerInVoltsAndMilliamps(VOLTS, MAX_AMPS);
 
   serialProcessor.Init(kBaudRate);
   ButtonStart();
   for (size_t i = 0; i < kNumSensors; ++i) {
     // Button numbers should start with 1.
     kSensors[i].Init(i + 1);
-    //kSensors[i].UpdateThreshold(700);
+    kSensors[i].UpdateThreshold(700);
   }
-  kSensors[0].UpdateThreshold(300);
-  kSensors[1].UpdateThreshold(300);
-  kSensors[2].UpdateThreshold(270);
-  kSensors[3].UpdateThreshold(300);
-  kSensors[4].UpdateThreshold(650);
-  kSensors[5].UpdateThreshold(450);
-  kSensors[6].UpdateThreshold(550);
-  kSensors[7].UpdateThreshold(550);
-
+  
   #if defined(CLEAR_BIT) && defined(SET_BIT)
 	  // Set the ADC prescaler to 16 for boards that support it,
 	  // which is a good balance between speed and accuracy.
@@ -624,11 +766,47 @@ void loop() {
   // Since willSend is static, we want to make sure we update the variable
   // every time we loop.
   willSend = (loopTime == -1 || startMicros - lastSend + loopTime >= 1000);
+  static bool lightUpdate;
+  lightUpdate = (lightLoop == -1 || startMicros - lastLightUpdate + lightLoop >= 20000);
 
   serialProcessor.CheckAndMaybeProcessData();
 
   for (size_t i = 0; i < kNumSensors; ++i) {
     kSensors[i].EvaluateSensor(willSend);
+
+    if(lightUpdate) {
+      int panelIndex = 0;
+      switch(i) {
+        case 0:
+        case 1:
+          panelIndex = 0;
+          break;
+        case 2:
+        case 3:
+          panelIndex = 1;
+          break;
+        case 4:
+        case 5:
+          panelIndex = 2;
+          break;
+        case 6:
+        case 7:
+          panelIndex = 3;
+          break;
+      }
+      
+      if(!states[panelIndex].CombinedStateIsOn()) {
+        endToEndIdle(panelIndex);
+
+        if(i % 2 != 0) {
+          animationFrames[panelIndex]++;
+          if(animationFrames[panelIndex] >= TOTAL_FRAMES) { animationFrames[panelIndex] = 0; }
+        }
+      } else {
+        //Reset animation frame if triggered
+        //animationFrames[panelIndex] = 0;
+      }
+    }
   }
 
   if (willSend) {
@@ -638,9 +816,16 @@ void loop() {
     #endif
   }
 
+  if(lightUpdate) {
+    lastLightUpdate = startMicros;
+    FastLED.show();
+  }
+
   if (loopTime == -1) {
     loopTime = micros() - startMicros;
   }
 
-  checkAndUpdateLights();
+  if(lightLoop == -1) {
+    lightLoop = micros() - startMicros;
+  }
 }
