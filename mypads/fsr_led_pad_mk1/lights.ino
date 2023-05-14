@@ -13,6 +13,7 @@ CRGB leds[NUM_STRIPS][NUM_LEDS];
 int currentColorSet = 0;
 int TOTAL_FRAMES = 96;
 int animationFrames[4] = {0, 0, 0, 0};
+bool lightUpdateFlag = false;
 unsigned long lastLightUpdate = 0;
 uint32_t interval;
 
@@ -27,7 +28,7 @@ void lightInit() {
   FastLED.setMaxPowerInVoltsAndMilliamps(VOLTS, MAX_AMPS);
 }
 
-void endToEndIdle(int panelIndex) {
+void endToEndIdle(int panelIndex, bool incrementFrame) {
   bool loopBack = animationFrames[panelIndex] < NUM_LEDS;
   int ledIndex = loopBack ? animationFrames[panelIndex] : animationFrames[panelIndex] - NUM_LEDS;
 
@@ -45,9 +46,10 @@ void endToEndIdle(int panelIndex) {
 
   leds[panelIndex][ledIndex] = color;
 
-  animationFrames[panelIndex]++;
-  if(animationFrames[panelIndex] >= TOTAL_FRAMES) { animationFrames[panelIndex] = 0; }
-}
+  if(incrementFrame) {
+    animationFrames[panelIndex]++;
+    if(animationFrames[panelIndex] >= TOTAL_FRAMES) { animationFrames[panelIndex] = 0; }
+  }}
 
 void clearPanelLEDs(int k) {
   for(int i = 0; i < NUM_LEDS; i++) { leds[k][i] = CRGB::Black; }
@@ -59,15 +61,15 @@ void activePanelLEDs(int k) {
   FastLED.show();
 }
 
-void checkAndUpdateLights() {
+void checkLightTiming() {
   if (millis() - lastLightUpdate >= 20) {
     lastLightUpdate = millis();
-
-    for(int i = 0; i < NUM_STRIPS; i++) {
-      if(!states[i].CombinedStateIsOn()) {
-        endToEndIdle(i);
-      }
-    }
-    FastLED.show();
+    lightUpdateFlag = true;
+  } else {
+    lightUpdateFlag = false;
   }
+}
+
+void showLights() {
+  FastLED.show();
 }

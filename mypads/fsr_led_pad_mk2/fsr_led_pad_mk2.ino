@@ -584,6 +584,7 @@ unsigned long lastSend = 0;
 // loopTime is used to estimate how long it takes to run one iteration of
 // loop().
 long loopTime = -1;
+extern bool lightUpdateFlag;
 
 void setup() {
   lightInit();
@@ -626,9 +627,16 @@ void loop() {
   willSend = (loopTime == -1 || startMicros - lastSend + loopTime >= 1000);
 
   serialProcessor.CheckAndMaybeProcessData();
+  checkLightTiming();
 
   for (size_t i = 0; i < kNumSensors; ++i) {
     kSensors[i].EvaluateSensor(willSend);
+    if(lightUpdateFlag) {
+      int panelIndex = i > 3 ? i - 4 : i;
+      if(!states[panelIndex].CombinedStateIsOn()) {
+        endToEndIdle(panelIndex, i > 3);
+      }
+    }
   }
 
   if (willSend) {
@@ -642,5 +650,7 @@ void loop() {
     loopTime = micros() - startMicros;
   }
 
-  checkAndUpdateLights();
+  if(lightUpdateFlag) {
+    showLights();
+  }
 }
